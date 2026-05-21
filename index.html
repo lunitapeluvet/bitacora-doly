@@ -122,6 +122,7 @@
     reportPhase: 'idle',   // idle | selecting | picking-date | loaded
     reportType: null,
     reportDate: null,
+    calendarMonth: null,
     report: null,
     loading: false,
   };
@@ -273,6 +274,79 @@
     }
   }
 
+  // ── CALENDARIO DE SEMANAS ─────────────────────────────────────────────────
+  function calPrev() {
+    const d = S.calendarMonth || now();
+    S.calendarMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    render();
+  }
+  function calNext() {
+    const d = S.calendarMonth || now();
+    S.calendarMonth = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    render();
+  }
+  function calSelectMonday(dateStr) {
+    S.reportDate = S.reportDate === dateStr ? null : dateStr;
+    render();
+  }
+
+  function tplWeekCalendar() {
+    const ref  = S.calendarMonth || now();
+    const year = ref.getFullYear();
+    const month = ref.getMonth();
+    const today = now();
+
+    const monthName = new Date(year, month, 1)
+      .toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+    const headers = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+      .map(h => `<div style="text-align:center;font-size:10px;color:var(--faint);letter-spacing:0.06em;padding:4px 0;">${h}</div>`)
+      .join('');
+
+    const firstDow = new Date(year, month, 1).getDay();
+    const offset   = firstDow === 0 ? 6 : firstDow - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    let cells = Array(offset).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const dayCells = cells.map((day, i) => {
+      if (!day) return `<div></div>`;
+      const col        = i % 7;
+      const isMonday   = col === 0;
+      const dateStr    = `${year}-${pad(month+1)}-${pad(day)}`;
+      const isSelected = S.reportDate === dateStr;
+      const isToday    = year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
+
+      if (isMonday) {
+        return `<div onclick="calSelectMonday('${dateStr}')"
+          style="padding:7px 2px;text-align:center;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;
+          background:${isSelected ? 'var(--dark-teal)' : 'var(--surface2)'};
+          color:${isSelected ? '#fff' : 'var(--dark-teal)'};">${day}</div>`;
+      }
+      return `<div style="padding:7px 2px;text-align:center;font-size:13px;
+        color:${isToday ? 'var(--orange)' : 'var(--faint)'};">${day}</div>`;
+    }).join('');
+
+    const canConfirm  = !!S.reportDate;
+    const confirmStyle = canConfirm ? '' : 'opacity:0.4;pointer-events:none;';
+
+    return `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <button onclick="calPrev()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);padding:0 10px;line-height:1;">‹</button>
+          <div style="font-size:13px;font-weight:bold;text-transform:capitalize;">${monthName}</div>
+          <button onclick="calNext()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);padding:0 10px;line-height:1;">›</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px;">${headers}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">${dayCells}</div>
+      </div>
+      <button class="salida-btn" style="margin-top:14px;${confirmStyle}" onclick="doReport('weekly')">
+        ${canConfirm ? 'Ver semana del ' + S.reportDate : 'Selecciona un lunes'}
+      </button>`;
+  }
+
   // ── TEMPLATE: INFORMES ─────────────────────────────────────────────────────
   function tplInformes() {
     if (S.reportPhase === 'idle') return `
@@ -287,23 +361,30 @@
       </div>`;
 
     if (S.reportPhase === 'picking-date') {
-      const labels  = { daily:'¿Qué día quieres ver?', weekly:'¿Qué semana quieres ver?', monthly:'¿Qué mes quieres ver?' };
-      const hints   = { daily:'', weekly:'Selecciona cualquier día de la semana', monthly:'' };
-      const iType   = S.reportType === 'monthly' ? 'month' : 'date';
-      const defVal  = S.reportType === 'monthly' ? fISO(now()).slice(0,7) : fISO(now());
-      return `
-      <div class="informes-wrap">
-        <div style="padding-top:30px;max-width:320px;margin:0 auto;">
-          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:20px;text-align:center;">${labels[S.reportType]}</div>
-          <input type="${iType}" id="report-date" value="${defVal}"
-            style="width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit;margin-bottom:${hints[S.reportType]?'6':'14'}px;outline:none;">
-          ${hints[S.reportType] ? `<div style="font-size:11px;color:var(--faint);text-align:center;margin-bottom:14px;">${hints[S.reportType]}</div>` : ''}
-          <button class="salida-btn" style="margin-bottom:10px;" onclick="confirmReportDate()">Ver informe</button>
-          <div style="text-align:center;">
-            <button class="back-btn" onclick="S.reportPhase='selecting';render()">← Volver</button>
+      if (S.reportType === 'weekly') return `
+        <div class="informes-wrap">
+          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:16px;text-align:center;">¿Qué semana quieres ver?</div>
+          ${tplWeekCalendar()}
+          <div style="text-align:center;margin-top:10px;">
+            <button class="back-btn" onclick="S.reportPhase='selecting';S.reportDate=null;render()">← Volver</button>
           </div>
-        </div>
-      </div>`;
+        </div>`;
+
+      const labels = { daily:'¿Qué día quieres ver?', monthly:'¿Qué mes quieres ver?' };
+      const iType  = S.reportType === 'monthly' ? 'month' : 'date';
+      const defVal = S.reportType === 'monthly' ? fISO(now()).slice(0,7) : fISO(now());
+      return `
+        <div class="informes-wrap">
+          <div style="padding-top:30px;max-width:320px;margin:0 auto;">
+            <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:20px;text-align:center;">${labels[S.reportType]}</div>
+            <input type="${iType}" id="report-date" value="${defVal}"
+              style="width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit;margin-bottom:14px;outline:none;">
+            <button class="salida-btn" style="margin-bottom:10px;" onclick="confirmReportDate()">Ver informe</button>
+            <div style="text-align:center;">
+              <button class="back-btn" onclick="S.reportPhase='selecting';render()">← Volver</button>
+            </div>
+          </div>
+        </div>`;
     }
 
     if (S.reportPhase === 'selecting') return `
