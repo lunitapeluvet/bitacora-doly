@@ -199,6 +199,16 @@
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();doAdd();}"></textarea>
           <button class="add-btn" onclick="doAdd()">+</button>
         </div>
+        ${Date.now() - S.session.arrivalTs > 43200000 ? `
+        <div style="margin:0 22px 0;padding:14px 16px;background:#fff3cd;border:1px solid #ffeaa0;border-radius:10px;font-size:13px;color:#7a5c00;">
+          <div style="font-weight:bold;margin-bottom:8px;">⚠️ La sesión lleva más de 12 horas activa</div>
+          <div style="margin-bottom:10px;">¿Olvidaste cerrar el día anterior? Ingresa la hora real de salida:</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="time" id="dep-time-input" value="17:00"
+              style="padding:8px 12px;border:1px solid #ffc107;border-radius:8px;background:#fffdf0;font-size:14px;font-family:inherit;outline:none;flex:1;">
+            <button onclick="doSalidaConHora()" style="background:#f87523;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:bold;cursor:pointer;white-space:nowrap;">Cerrar con esta hora</button>
+          </div>
+        </div>` : ''}
         <div class="salida-area">
           <button class="salida-btn" onclick="doSalida()">SALIDA — cerrar jornada</button>
         </div>
@@ -242,9 +252,18 @@
     inp.focus();
   }
 
-  async function doSalida() {
+  function doSalidaConHora() {
+    const inp = document.getElementById('dep-time-input');
+    if (!inp || !inp.value) return;
+    const arrival = new Date(S.session.arrivalTs);
+    const [h, m]  = inp.value.split(':').map(Number);
+    const customEnd = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate(), h, m, 0);
+    doSalida(customEnd.getTime());
+  }
+
+  async function doSalida(customEndTs) {
     if (!S.session) return;
-    const endTs   = Date.now();
+    const endTs   = customEndTs || Date.now();
     const arrival = new Date(S.session.arrivalTs);
     const elapsed = fElap(endTs - S.session.arrivalTs);
     const actsText = S.session.activities.length > 0
