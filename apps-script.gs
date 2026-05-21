@@ -4,7 +4,7 @@
 // Luego: Deploy > New Deployment > Web App > Anyone > Deploy
 // ============================================================
 
-const SHEET_NAME = 'Bitacora';
+const SHEET_NAME = 'Bitácora';
 
 function doGet(e) {
   const action = e.parameter.action;
@@ -40,21 +40,44 @@ function doGet(e) {
     let filtered = [];
 
     if (type === 'daily') {
-      const todayStr = formatDateStr(today);
-      filtered = rows.filter(r => String(r[0]).trim() === todayStr);
-
-    } else if (type === 'weekly') {
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - today.getDay() + 1); // Lunes
+      const dateParam = e.parameter.date;
+      const target = dateParam ? new Date(dateParam + 'T00:00:00') : today;
+      target.setHours(0, 0, 0, 0);
+      const targetStr = formatDateStr(target);
       filtered = rows.filter(r => {
         const d = parseDate(r[0]);
-        return d && d >= weekStart && d <= today;
+        return d && formatDateStr(d) === targetStr;
+      });
+
+    } else if (type === 'weekly') {
+      const dateParam = e.parameter.date;
+      const ref = dateParam ? new Date(dateParam + 'T00:00:00') : today;
+      ref.setHours(0, 0, 0, 0);
+      const weekStart = new Date(ref);
+      const dow = ref.getDay();
+      weekStart.setDate(ref.getDate() - (dow === 0 ? 6 : dow - 1)); // Lunes
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      filtered = rows.filter(r => {
+        const d = parseDate(r[0]);
+        return d && d >= weekStart && d <= weekEnd;
       });
 
     } else if (type === 'monthly') {
+      const dateParam = e.parameter.date; // YYYY-MM o YYYY-MM-DD
+      let targetMonth, targetYear;
+      if (dateParam) {
+        const parts = dateParam.split('-');
+        targetYear  = parseInt(parts[0]);
+        targetMonth = parseInt(parts[1]) - 1;
+      } else {
+        targetMonth = today.getMonth();
+        targetYear  = today.getFullYear();
+      }
       filtered = rows.filter(r => {
         const d = parseDate(r[0]);
-        return d && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        return d && d.getMonth() === targetMonth && d.getFullYear() === targetYear;
       });
     }
 

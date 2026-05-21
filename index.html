@@ -77,6 +77,13 @@
     ::-webkit-scrollbar { width:5px; }
     ::-webkit-scrollbar-track { background:transparent; }
     ::-webkit-scrollbar-thumb { background:#c8b89a; border-radius:3px; }
+
+    /* FOOTER */
+    .app-footer { padding:10px 22px; background:var(--surface); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:center; gap:10px; flex-shrink:0; }
+    .footer-logo { height:20px; opacity:0.8; }
+    .footer-text { font-size:11px; color:var(--faint); letter-spacing:0.04em; }
+    .footer-text a { color:var(--dark-teal); text-decoration:none; font-weight:bold; }
+    .footer-text a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -99,6 +106,12 @@
   <!-- MAIN -->
   <div id="main" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"></div>
 
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <img class="footer-logo" src="https://raw.githubusercontent.com/brendario/rio-impulso-digital/refs/heads/main/assets/branding/rio-logo-primary.png" alt="RiO Impulso Digital">
+    <span class="footer-text">Desarrollado por <a href="https://brendario.github.io/rio-impulso-digital" target="_blank" rel="noopener">RiO Impulso Digital</a> · Bitácora de Trabajo · Mayo 2026</span>
+  </footer>
+
 <script>
   const URL_GS = "https://script.google.com/macros/s/AKfycbyUqWLiXTcw0o5cjRyrlZuR9Y-cmP2IHManoRFLUOgzo27vPGdTm-liw6-Sn3UM36s7/exec";
 
@@ -106,8 +119,9 @@
   let S = {
     tab: 'session',
     session: JSON.parse(localStorage.getItem('bitacora_session') || 'null'),
-    reportPhase: 'idle',   // idle | selecting | loaded
+    reportPhase: 'idle',   // idle | selecting | picking-date | loaded
     reportType: null,
+    reportDate: null,
     report: null,
     loading: false,
   };
@@ -272,19 +286,39 @@
         </div>
       </div>`;
 
+    if (S.reportPhase === 'picking-date') {
+      const labels  = { daily:'¿Qué día quieres ver?', weekly:'¿Qué semana quieres ver?', monthly:'¿Qué mes quieres ver?' };
+      const hints   = { daily:'', weekly:'Selecciona cualquier día de la semana', monthly:'' };
+      const iType   = S.reportType === 'monthly' ? 'month' : 'date';
+      const defVal  = S.reportType === 'monthly' ? fISO(now()).slice(0,7) : fISO(now());
+      return `
+      <div class="informes-wrap">
+        <div style="padding-top:30px;max-width:320px;margin:0 auto;">
+          <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:20px;text-align:center;">${labels[S.reportType]}</div>
+          <input type="${iType}" id="report-date" value="${defVal}"
+            style="width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit;margin-bottom:${hints[S.reportType]?'6':'14'}px;outline:none;">
+          ${hints[S.reportType] ? `<div style="font-size:11px;color:var(--faint);text-align:center;margin-bottom:14px;">${hints[S.reportType]}</div>` : ''}
+          <button class="salida-btn" style="margin-bottom:10px;" onclick="confirmReportDate()">Ver informe</button>
+          <div style="text-align:center;">
+            <button class="back-btn" onclick="S.reportPhase='selecting';render()">← Volver</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     if (S.reportPhase === 'selecting') return `
       <div class="informes-wrap">
         <div style="padding-top:20px;">
           <div style="font-size:11px;color:var(--faint);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:16px;text-align:center;">¿Qué período quieres ver?</div>
-          <button class="rpt-option" style="border-left:4px solid #f87523" onclick="doReport('daily')">
+          <button class="rpt-option" style="border-left:4px solid #f87523" onclick="S.reportPhase='picking-date';S.reportType='daily';render()">
             <div><div style="font-size:14px;font-weight:bold;">Informe diario</div><div style="font-size:11px;color:var(--muted);margin-top:3px;">Actividades de hoy</div></div>
             <span style="font-size:18px;color:#f87523">→</span>
           </button>
-          <button class="rpt-option" style="border-left:4px solid #1db7b9" onclick="doReport('weekly')">
+          <button class="rpt-option" style="border-left:4px solid #1db7b9" onclick="S.reportPhase='picking-date';S.reportType='weekly';render()">
             <div><div style="font-size:14px;font-weight:bold;">Informe semanal</div><div style="font-size:11px;color:var(--muted);margin-top:3px;">Resumen de esta semana</div></div>
             <span style="font-size:18px;color:#1db7b9">→</span>
           </button>
-          <button class="rpt-option" style="border-left:4px solid #126d68" onclick="doReport('monthly')">
+          <button class="rpt-option" style="border-left:4px solid #126d68" onclick="S.reportPhase='picking-date';S.reportType='monthly';render()">
             <div><div style="font-size:14px;font-weight:bold;">Informe mensual</div><div style="font-size:11px;color:var(--muted);margin-top:3px;">Resumen del mes en curso</div></div>
             <span style="font-size:18px;color:#126d68">→</span>
           </button>
@@ -304,8 +338,9 @@
           <div>
             <div style="font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:0.12em;">Informe</div>
             <div style="font-size:16px;font-weight:bold;">${titles[S.reportType]}</div>
+            ${S.reportDate ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${S.reportDate}</div>` : ''}
           </div>
-          <button class="nuevo-btn" onclick="S.reportPhase='idle';S.report=null;render()">+ Nuevo informe</button>
+          <button class="nuevo-btn" onclick="S.reportPhase='idle';S.report=null;S.reportDate=null;render()">+ Nuevo informe</button>
         </div>
         ${body}
       </div>`;
@@ -348,6 +383,13 @@
     arrow.textContent   = open ? '▼'     : '▲';
   }
 
+  function confirmReportDate() {
+    const input = document.getElementById('report-date');
+    const defaultVal = S.reportType === 'monthly' ? fISO(now()).slice(0,7) : fISO(now());
+    S.reportDate = input ? input.value : defaultVal;
+    doReport(S.reportType);
+  }
+
   async function doReport(type) {
     S.reportType  = type;
     S.reportPhase = 'loaded';
@@ -355,7 +397,9 @@
     S.report      = null;
     render();
     try {
-      const res  = await fetch(`${URL_GS}?action=report&type=${type}`);
+      let url = `${URL_GS}?action=report&type=${type}`;
+      if (S.reportDate) url += `&date=${S.reportDate}`;
+      const res  = await fetch(url);
       const data = await res.json();
       if (data.success) S.report = data;
       else flash('error', 'Error al cargar el informe');
