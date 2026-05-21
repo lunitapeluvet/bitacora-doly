@@ -241,7 +241,7 @@
       date:       fISO(arrival),
       arrival:    fTime(arrival),
       departure:  fTime(new Date(endTs)),
-      activities: encodeURIComponent(actsText),
+      activities: actsText,
       duration:   String(calcH(S.session.arrivalTs, endTs)),
     });
 
@@ -250,8 +250,10 @@
     render();
 
     try {
-      await fetch(`${URL_GS}?${params}`, { mode: 'no-cors' });
-      flash('ok', `✓ Jornada guardada — ${elapsed} trabajadas`);
+      const res = await fetch(`${URL_GS}?${params}`);
+      const data = await res.json();
+      if (data.success) flash('ok', `✓ Jornada guardada — ${elapsed} trabajadas`);
+      else flash('error', `Error al guardar: ${data.error || 'respuesta inesperada'}`);
     } catch {
       flash('error', 'Sin conexión — verifica tu internet');
     }
